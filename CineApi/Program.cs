@@ -24,7 +24,7 @@ builder.Services.AddCors(opt => opt.AddDefaultPolicy(policy =>
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<CineContext>(opt =>
-    opt.UseInMemoryDatabase("TodoList"));
+    opt.UseInMemoryDatabase("CineApp"));
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
