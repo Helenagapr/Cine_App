@@ -1,8 +1,17 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace CineApi.Models;
 
 public class Sala {
-   public long id { get; set; }
-   public int numero { get; set; }
-   public int capacidad { get; set; }
-   public string? tipoSala { get; set; }
+
+    [Key]
+    public long id { get; set; }
+
+    [Required]
+    public int numero { get; set; }
+
+    public int capacidad { get; set; }
+
+    public string? tipoSala { get; set; }
+    
 }
