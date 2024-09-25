@@ -13,5 +13,10 @@ public class Sala {
     public int capacidad { get; set; }
 
     public string? tipoSala { get; set; }
-    
+
+    public ICollection<Funcion> funciones { get; set; }
+
+    public ICollection<Fila> filas { get; set; }
+
+
 }

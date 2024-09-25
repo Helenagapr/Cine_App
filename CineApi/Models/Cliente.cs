@@ -15,4 +15,6 @@ public class Cliente {
     public string? telefono { get; set; }
 
     public DateOnly fechaRegistro { get; set; }
+
+    public ICollection<Boleto> historialCompras { get; set; }
 }

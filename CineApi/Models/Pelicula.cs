@@ -24,6 +24,9 @@ public class Pelicula {
 
     public string? director { get; set; }
 
-    public byte[]? poster { get; set; }
-    
+    public string? poster { get; set; }
+
+    public ICollection<Boleto> boletosVendidos { get; set; }
+    public ICollection<Funcion> funciones { get; set; }
+
 }

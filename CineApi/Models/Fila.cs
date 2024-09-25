@@ -14,5 +14,7 @@ public class Fila {
     [ForeignKey("salaId")]
     public long salaId { get; set; }
     public Sala sala { get; set; }
-    
+
+    public ICollection<Butaca> butacas { get; set; }
+
 }

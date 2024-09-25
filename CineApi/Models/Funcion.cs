@@ -19,5 +19,7 @@ public class Funcion {
     public long salaId { get; set; }
     public Sala sala { get; set; }
 
+    public ICollection<Boleto> boletosVendidos { get; set; }
+
 
 }
