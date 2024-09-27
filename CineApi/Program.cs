@@ -1,12 +1,11 @@
 using CineApi;
 using CineApi.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Text;
 using CineApi.Models;
 using CineApi.DTO;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.Configuration;
-using System.Text;
-using Microsoft.AspNetCore.Routing.Constraints;
+using Microsoft.IdentityModel.Tokens;
 
 
 
@@ -24,14 +23,29 @@ builder.Services.AddCors(opt => opt.AddDefaultPolicy(policy =>
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<CineContext>(opt =>
-    opt.UseInMemoryDatabase("CineApp"));
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("FilmFlowBBDD")));
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddAutoMapper(typeof(MapConfig)); // falta la clase MapConfig
+builder.Services.AddAutoMapper(typeof(MapConfig)); 
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opt =>  {
+        opt.TokenValidationParameters = new TokenValidationParameters{
+
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+
+        };
+    });
 
 var app = builder.Build();
 
@@ -42,8 +56,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseRouting();
+
 app.UseHttpsRedirection();
 
+app.UseCors();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
