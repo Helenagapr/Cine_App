@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CineApi.Data;
 using CineApi.Models;
+using AutoMapper;
+using CineApi.DTO;
 
 namespace CineApi.Controllers
 {
@@ -14,95 +16,203 @@ namespace CineApi.Controllers
     [ApiController]
     public class BoletoController : ControllerBase
     {
-        private readonly CineContext _context;
+        private readonly ILogger<BoletoController> _logger;
+        private readonly CineContext _bbdd;
+        private readonly IMapper _mapper;
 
-        public BoletoController(CineContext context)
+        public BoletoController(
+            ILogger<BoletoController> logger,
+            CineContext bbdd,
+            IMapper mapper
+        )
         {
-            _context = context;
+            _logger = logger;
+            _bbdd = bbdd;
+            _mapper = mapper;
         }
 
         // GET: api/Boleto
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Boleto>>> GetBoletos()
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<ActionResult<IEnumerable<BoletoDTO>>> GetBoletos(
+            [FromQuery] string? nombreCliente = null,
+            [FromQuery] DateTime? fechaCompra = null,
+            [FromQuery] string? tituloPelicula = null,
+            [FromQuery] string? categoriaEntrada = null)
         {
-            return await _context.Boletos.ToListAsync();
+            _logger.LogInformation("Obteniendo boletos"); 
+
+            IQueryable<Boleto> query = _bbdd
+                .Boletos
+                .Include(b => b.cliente)
+                .Include(b => b.pelicula)
+                .Include(b => b.butaca)
+                .Include(b => b.categoriaEntrada);
+            
+            if (!string.IsNullOrEmpty(nombreCliente)){
+                query = query.Where(b => b.cliente.nombre.Contains(nombreCliente));
+            }
+            if (fechaCompra.HasValue){
+                query = query.Where(b => b.fechaCompra.Date == fechaCompra.Value.Date);
+            }
+            if (!string.IsNullOrEmpty(tituloPelicula)){
+                query = query.Where(b => b.pelicula.titulo.Contains(tituloPelicula));
+            }
+            if (!string.IsNullOrEmpty(categoriaEntrada)){
+                query = query.Where(b => b.categoriaEntrada.nombre.Contains(categoriaEntrada));
+            }
+
+            var boletoList = await query.ToListAsync();
+
+            return Ok(_mapper.Map<IEnumerable<BoletoDTO>>(boletoList));
         }
 
         // GET: api/Boleto/5
-        [HttpGet("{id}")]
+        [HttpGet("{id:long}", Name = "GetBoleto")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Boleto>> GetBoleto(long id)
-        {
-            var boleto = await _context.Boletos.FindAsync(id);
+        {   
+            if (id <= 0) {
+                _logger.LogError("Formato de ID incorrecto");
+                return BadRequest("Formato de ID incorrecto");
+            }
+
+            var boleto = await _bbdd.Boletos
+                .Include(b => b.cliente)
+                .Include(b => b.pelicula)
+                .Include(b => b.butaca)
+                .Include(b => b.categoriaEntrada)
+                .FirstOrDefaultAsync(b => b.id == id);
 
             if (boleto == null)
             {
-                return NotFound();
+                _logger.LogError("No se encontro el boleto con ID {id}");
+                return NotFound("No se encontro el boleto con ID {id}");
             }
 
-            return boleto;
+            return Ok(_mapper.Map<IEnumerable<BoletoDTO>>(boleto));
         }
 
         // PUT: api/Boleto/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutBoleto(long id, Boleto boleto)
+        [HttpPut("{id: long}")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> PutBoleto(long id, 
+            [FromBody] BoletoDTO formBoleto )
         {
-            if (id != boleto.id)
+            if (id != formBoleto.id || formBoleto == null)
             {
-                return BadRequest();
+                _logger.LogError("No existe la ID indicada");
+                return BadRequest("No existe la ID indicada");
             }
 
-            _context.Entry(boleto).State = EntityState.Modified;
+            var existeixBoleto = await _bbdd.Boletos.AsNoTracking().FirstOrDefaultAsync(h => h.id == id);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!BoletoExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+            if(existeixBoleto == null){
+                _logger.LogError("No existe ningun boleto con la ID indicada");
+                return NotFound("No existe ningun boleto con la ID indicada");
             }
 
+            Boleto boleto = _mapper.Map<Boleto>(formBoleto);
+
+
+            var cliente = await _bbdd.Clientes.FindAsync(formBoleto.clienteId);
+
+            var pelicula = await _bbdd.Peliculas.FindAsync(formBoleto.peliculaId);
+
+            var butaca = await _bbdd.Butacas.FindAsync(formBoleto.butacaId);
+
+            var categoriaEntrada = await _bbdd.CategoriaEntradas.FindAsync(formBoleto.categoriaEntradaId);
+
+
+            if (cliente == null) return BadRequest("No existe ningún cliente con el indicado");
+            
+            if (pelicula == null) return BadRequest("No existe ninguna pelicula con el indicado");
+            
+            if (butaca == null) return BadRequest("No existe ninguna butaca con el indicado");
+            
+            if (categoriaEntrada == null) return BadRequest("No existe ninguna categoria con el indicado");
+
+            _bbdd.Boletos.Update(boleto);
+            await _bbdd.SaveChangesAsync();
+
+            _logger.LogInformation("Boleto actualizado correctamente");
             return NoContent();
         }
 
         // POST: api/Boleto
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Boleto>> PostBoleto(Boleto boleto)
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<CreateBoletoDTO>> PostBoleto(
+            [FromBody] CreateBoletoDTO formBoleto
+        )
         {
-            _context.Boletos.Add(boleto);
-            await _context.SaveChangesAsync();
+            if(!ModelState.IsValid) return BadRequest("El form es incorrecto: " + ModelState);
 
-            return CreatedAtAction(nameof(GetBoleto), new { id = boleto.id }, boleto);
+            var cliente = await _bbdd.Clientes.FindAsync(formBoleto.clienteId);
+
+            var pelicula = await _bbdd.Peliculas.FindAsync(formBoleto.peliculaId);
+
+            var butaca = await _bbdd.Butacas.FindAsync(formBoleto.butacaId);
+
+            var categoriaEntrada = await _bbdd.CategoriaEntradas.FindAsync(formBoleto.categoriaEntradaId);
+
+            if (cliente == null) return BadRequest("No existe ningún cliente con el indicado");
+            
+
+            if (pelicula == null) return BadRequest("No existe ninguna pelicula con el indicado");
+            
+
+            if (butaca == null) return BadRequest("No existe ninguna butaca con el indicado");
+            
+
+            if (categoriaEntrada == null) return BadRequest("No existe ninguna categoria con el indicado");
+            
+            Boleto boleto = _mapper.Map<Boleto>(formBoleto);
+            boleto.clienteId = cliente.id;
+            boleto.peliculaId = pelicula.id;
+            boleto.butacaId = butaca.id;
+            boleto.categoriaEntradaId = categoriaEntrada.id;
+
+            await _bbdd.Boletos.AddAsync(boleto);
+            await _bbdd.SaveChangesAsync();
+
+            _logger.LogInformation("Boleto creado correctamente");
+            
+            return CreatedAtAction(nameof(GetBoleto), new { id = boleto.id }, formBoleto);
         }
 
         // DELETE: api/Boleto/5
-        [HttpDelete("{id}")]
+        [HttpDelete("{id: long}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteBoleto(long id)
         {
-            var boleto = await _context.Boletos.FindAsync(id);
-            if (boleto == null)
-            {
-                return NotFound();
+            if(id <= 0){
+                _logger.LogError("Formato d'ID incorrecte");
+                return BadRequest("Formato d'ID incorrecte");
             }
 
-            _context.Boletos.Remove(boleto);
-            await _context.SaveChangesAsync();
+            var boleto = await _bbdd.Boletos.FirstOrDefaultAsync(h => h.id == id);
 
+            if (boleto == null)
+            {
+                _logger.LogError("ID de boleto no encontrado");
+                return NotFound("ID de boleto no encontrado");
+            }
+
+            _bbdd.Boletos.Remove(boleto);
+            await _bbdd.SaveChangesAsync();
+
+            _logger.LogInformation("Boleto borrado correctamente");
             return NoContent();
-        }
-
-        private bool BoletoExists(long id)
-        {
-            return _context.Boletos.Any(e => e.id == id);
         }
     }
 }
