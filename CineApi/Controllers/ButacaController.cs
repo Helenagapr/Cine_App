@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CineApi.Data;
 using CineApi.Models;
+using CineApi.DTO;
+using AutoMapper;
 
 namespace CineApi.Controllers
 {
@@ -14,11 +16,19 @@ namespace CineApi.Controllers
     [ApiController]
     public class ButacaController : ControllerBase
     {
-        private readonly CineContext _context;
+        private readonly CineContext _bbdd;
+        private readonly ILogger<ButacaController> _logger;
+        private readonly IMapper _mapper;
 
-        public ButacaController(CineContext context)
+        public ButacaController(
+            ILogger<ButacaController> logger,
+            CineContext bbdd,
+            IMapper mapper
+        )
         {
-            _context = context;
+            _logger = logger;
+            _bbdd = bbdd;
+            _mapper = mapper;
         }
 
         // GET: api/Butaca

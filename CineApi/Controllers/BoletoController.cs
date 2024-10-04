@@ -136,6 +136,11 @@ namespace CineApi.Controllers
             
             if (categoriaEntrada == null) return BadRequest("No existe ninguna categoria con el indicado");
 
+            boleto.clienteId = cliente.id;
+            boleto.peliculaId = pelicula.id;
+            boleto.butacaId = butaca.id;
+            boleto.categoriaEntradaId = categoriaEntrada.id;
+
             _bbdd.Boletos.Update(boleto);
             await _bbdd.SaveChangesAsync();
 
